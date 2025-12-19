@@ -2,6 +2,14 @@
 
 MoviePilot 插件，自动将订阅的电影和电视剧从 115 网盘分享链接转存到个人网盘。
 
+## 完整工作流
+
+本插件配合 [115网盘STRM助手](https://github.com/DDSRem-Dev/MoviePilot-Plugins) 可实现完整的自动化追剧流程：
+
+```
+MoviePilot订阅 -> 本插件搜索转存 -> STRM助手生成STRM -> 媒体库刮削 -> 播放器观看
+```
+
 ## 功能特点
 
 - **支持电影和电视剧**订阅自动追更
