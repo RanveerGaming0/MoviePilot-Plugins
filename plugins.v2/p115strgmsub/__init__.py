@@ -63,7 +63,7 @@ class P115StrgmSub(_PluginBase):
     # 配置属性
     _enabled: bool = False
     _onlyonce: bool = False
-    _cron: str = "30 * * * *"
+    _cron: str = "30 */8 * * *"
     _notify: bool = False
     _cookies: str = ""
     _pansou_enabled: bool = True  # 是否启用 PanSou 搜索
@@ -94,7 +94,7 @@ class P115StrgmSub(_PluginBase):
         # 加载配置
         if config:
             self._enabled = config.get("enabled", False)
-            self._cron = config.get("cron", "30 * * * *")
+            self._cron = config.get("cron", "30 */8 * * *")
             self._notify = config.get("notify", False)
             self._onlyonce = config.get("onlyonce", False)
             self._cookies = config.get("cookies", "")

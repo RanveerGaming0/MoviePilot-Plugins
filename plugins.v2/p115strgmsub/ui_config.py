@@ -159,7 +159,7 @@ class UIConfig:
             "notify": True,
             "onlyonce": False,
             "only_115": True,
-            "cron": "30 * * * *",
+            "cron": "30 */8 * * *",
             "save_path": "/我的接收/MoviePilot/TV",
             "movie_save_path": "/我的接收/MoviePilot/Movie",
             "cookies": "",
