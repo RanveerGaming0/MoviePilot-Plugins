@@ -115,7 +115,7 @@ def retry_on_failure(
                 except retryable_exceptions as e:
                     last_exception = e
                     if attempt < max_retries:
-                        logger.debug(f"请求失败 (尝试 {attempt + 1}/{max_retries + 1}): {e}, {delay:.1f}秒后重试...")
+                        logger.info(f"请求失败 (尝试 {attempt + 1}/{max_retries + 1}): {e}, {delay:.1f}秒后重试...")
                         time.sleep(delay)
                         delay *= backoff_factor
                     else:
@@ -290,7 +290,7 @@ class P115ClientManager:
                 self.path_cache.set(path, cid)
                 return cid
         except Exception as e:
-            logger.debug(f"直接获取路径 ID 失败 ({path}): {e}")
+            logger.info(f"直接获取路径 ID 失败 ({path}): {e}")
 
         # 如果不创建，则返回失败
         if not mkdir:
@@ -465,7 +465,7 @@ class P115ClientManager:
                 if "删除" in error_msg or "不存在" in error_msg or "delete" in error_msg_lower:
                     status.is_deleted = True
 
-                logger.debug(f"分享链接无效: {status.error_message} (errno: {status.error_code})")
+                logger.info(f"分享链接无效: {status.error_message} (errno: {status.error_code})")
 
         except Exception as e:
             status.error_message = f"检查分享状态异常: {str(e)}"
@@ -564,7 +564,7 @@ class P115ClientManager:
                     if target_season is not None:
                         skip_dir = self._should_skip_season_dir(dir_name, target_season)
                         if skip_dir:
-                            logger.debug(f"跳过非目标季目录: {dir_name} (目标: S{target_season})")
+                            logger.info(f"跳过非目标季目录: {dir_name} (目标: S{target_season})")
                             files.append(file_info)  # 仍然记录目录信息，但不递归
                             continue
 
@@ -801,7 +801,7 @@ class P115ClientManager:
                 import random
                 jitter = batch_interval * 0.3
                 actual_interval = batch_interval + random.uniform(-jitter, jitter)
-                logger.debug(f"批次间隔 {actual_interval:.1f} 秒")
+                logger.info(f"批次间隔 {actual_interval:.1f} 秒")
                 time.sleep(actual_interval)
 
         logger.info(f"批量转存完成: 成功 {len(success_ids)} 个，失败 {len(failed_ids)} 个")

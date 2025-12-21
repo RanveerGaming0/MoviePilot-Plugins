@@ -45,7 +45,7 @@ class P115StrgmSub(_PluginBase):
     # 插件图标
     plugin_icon = "https://raw.githubusercontent.com/jxxghp/MoviePilot-Plugins/main/icons/cloud.png"
     # 插件版本
-    plugin_version = "1.0.7"
+    plugin_version = "1.0.8"
     # 插件作者
     plugin_author = "mrtian2016"
     # 作者主页
@@ -403,6 +403,14 @@ class P115StrgmSub(_PluginBase):
                         force=True       # 强制完成
                     )
                     logger.info(f"✅ 订阅 {subscribe.name} 已完成并移至历史记录")
+                    # 发送订阅完成通知
+                    if self._notify:
+                        season_text = f" 第{subscribe.season}季" if subscribe.type == MediaType.TV.value and subscribe.season else ""
+                        self.post_message(
+                            mtype=NotificationType.Plugin,
+                            title="【115网盘订阅追更】订阅完成",
+                            text=f"🎉 {subscribe.name}{season_text} 所有内容已转存完成，订阅已移至历史记录。"
+                        )
                 except Exception as e:
                     logger.error(f"完成订阅时出错：{e}", exc_info=True)
         
@@ -563,6 +571,12 @@ class P115StrgmSub(_PluginBase):
         # 检查至少有一个搜索客户端可用
         if not self._pansou_enabled and not self._nullbr_enabled:
             logger.error("PanSou 和 Nullbr 搜索源均未启用，请至少启用一个搜索源")
+            if self._notify:
+                self.post_message(
+                    mtype=NotificationType.Plugin,
+                    title="【115网盘订阅追更】配置错误",
+                    text="PanSou 和 Nullbr 搜索源均未启用，请至少启用一个搜索源。"
+                )
             return
 
         # 检查已启用的搜索源是否成功初始化
@@ -581,6 +595,12 @@ class P115StrgmSub(_PluginBase):
 
         if not has_valid_client:
             logger.error("所有已启用的搜索源均初始化失败，请检查配置")
+            if self._notify:
+                self.post_message(
+                    mtype=NotificationType.Plugin,
+                    title="【115网盘订阅追更】配置错误",
+                    text="所有已启用的搜索源均初始化失败，请检查 PanSou URL 或 Nullbr APP ID/API Key 配置。"
+                )
             return
         
         if not self._p115_manager:
@@ -599,6 +619,12 @@ class P115StrgmSub(_PluginBase):
             return
 
         logger.info("开始执行 115 网盘订阅追更...")
+        if self._notify:
+            self.post_message(
+                mtype=NotificationType.Plugin,
+                title="【115网盘订阅追更】开始执行",
+                text="正在扫描订阅列表，搜索网盘资源并转存缺失内容..."
+            )
 
         # 重置 API 调用计数器
         if self._p115_manager:
@@ -615,6 +641,12 @@ class P115StrgmSub(_PluginBase):
         
         if not subscribes:
             logger.info("没有订阅中的数据")
+            if self._notify:
+                self.post_message(
+                    mtype=NotificationType.Plugin,
+                    title="【115网盘订阅追更】执行完成",
+                    text="当前没有订阅中的媒体数据。"
+                )
             return
 
         # 分类订阅
@@ -1195,8 +1227,16 @@ class P115StrgmSub(_PluginBase):
             logger.info(f"本次同步 API 调用统计: {', '.join(api_stats)}")
 
         # 发送汇总通知
-        if self._notify and transferred_count > 0:
-            self._send_transfer_notification(transfer_details, transferred_count)
+        if self._notify:
+            if transferred_count > 0:
+                self._send_transfer_notification(transfer_details, transferred_count)
+            else:
+                # 无转存时也发送通知
+                self.post_message(
+                    mtype=NotificationType.Plugin,
+                    title="【115网盘订阅追更】执行完成",
+                    text=f"本次同步完成，共处理 {len(tv_subscribes)} 个电视剧订阅、{len(movie_subscribes)} 个电影订阅，未发现需要转存的新资源。"
+                )
 
     def api_search(self, keyword: str, apikey: str) -> dict:
         """API: 搜索网盘资源"""
