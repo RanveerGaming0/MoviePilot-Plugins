@@ -31,7 +31,6 @@ from app.utils.string import StringUtils
 from .pansou import PanSouClient
 from .p115client import P115ClientManager
 from .nullbr import NullbrClient
-from .lib.hdhive import create_client as create_hdhive_client, MediaType as HDHiveMediaType
 from .ui_config import UIConfig
 from .file_matcher import FileMatcher, SubscribeFilter
 
@@ -97,10 +96,89 @@ class P115StrgmSub(_PluginBase):
     _nullbr_client: Optional[NullbrClient] = None
     _hdhive_client: Optional[Any] = None  # HDHive 客户端
 
+    def _download_so_file(self):
+        """
+        下载 hdhive .so 文件到 lib 目录
+        
+        从 GitHub 下载编译好的 .so 文件，用于 HDHive 功能
+        """
+        import platform
+        import urllib.request
+        import urllib.error
+        
+        # 确定目标目录
+        lib_dir = Path(__file__).parent / "lib"
+        lib_dir.mkdir(parents=True, exist_ok=True)
+        
+        # 确定系统架构和平台
+        machine = platform.machine().lower()
+        system = platform.system().lower()
+        
+        # 映射常见的架构名称
+        arch_map = {
+            "x86_64": "x86_64",
+            "amd64": "x86_64",
+            "aarch64": "aarch64",
+            "arm64": "aarch64",
+        }
+        arch = arch_map.get(machine, machine)
+        
+        # 映射平台名称
+        platform_map = {
+            "linux": "linux-gnu",
+            "darwin": "darwin",
+        }
+        plat = platform_map.get(system, system)
+        
+        # 构建文件名（Linux: hdhive.cpython-312-x86_64-linux-gnu.so）
+        # 目前只支持 Linux x86_64
+        so_filename = f"hdhive.cpython-312-{arch}-{plat}.so"
+        target_path = lib_dir / so_filename
+        
+        # 如果文件已存在，跳过下载
+        if target_path.exists():
+            logger.debug(f"hdhive .so 文件已存在: {target_path}")
+            return
+        
+        # GitHub 原始文件 URL
+        
+        base_url = "https://raw.githubusercontent.com/mrtian2016/hdhive_resource/main/"
+        download_url = f"{base_url}/{so_filename}"
+        
+        logger.info(f"开始下载 hdhive .so 文件: {download_url}")
+        
+        try:
+            # 下载文件
+            with urllib.request.urlopen(download_url, timeout=30) as response:
+                content = response.read()
+            
+            # 保存到本地
+            with open(target_path, "wb") as f:
+                f.write(content)
+            
+            # 设置可执行权限
+            import os
+            os.chmod(target_path, 0o755)
+            
+            logger.info(f"✓ hdhive .so 文件下载成功: {target_path}")
+            
+        except urllib.error.HTTPError as e:
+            if e.code == 404:
+                logger.warning(f"⚠️ hdhive .so 文件不存在（当前平台: {system}/{arch}），HDHive 功能可能无法使用")
+            else:
+                logger.error(f"下载 hdhive .so 文件失败 (HTTP {e.code}): {e}")
+        except urllib.error.URLError as e:
+            logger.error(f"下载 hdhive .so 文件失败（网络错误）: {e}")
+        except Exception as e:
+            logger.error(f"下载 hdhive .so 文件失败: {e}")
+
     def init_plugin(self, config: dict = None):
         """初始化插件"""
         # 停止现有任务
         self.stop_service()
+
+        # 下载.so文件
+        self._download_so_file()
 
         # 加载配置
         if config:
@@ -193,6 +271,7 @@ class P115StrgmSub(_PluginBase):
             elif self._hdhive_cookie:
                 # 优先使用 Cookie 初始化同步客户端
                 try:
+                    from .lib.hdhive import create_client as create_hdhive_client
                     self._hdhive_client = create_hdhive_client(cookie=self._hdhive_cookie)
                     logger.info("✓ HDHive 客户端初始化成功（Cookie 模式）")
                 except Exception as e:
@@ -443,6 +522,7 @@ class P115StrgmSub(_PluginBase):
         :param season: 季号（电视剧时使用）
         :return: 115网盘资源列表（统一格式）
         """
+        from .lib.hdhive import MediaType as HDHiveMediaType
         if not mediainfo.tmdb_id:
             logger.warning(f"⚠️ {mediainfo.title} 缺少 TMDB ID，无法使用 HDHive 查询")
             return []
