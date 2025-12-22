@@ -141,6 +141,25 @@ class UIConfig:
                             {'component': 'VCol', 'props': {'cols': 12, 'md': 3}, 'content': [{'component': 'VTextField', 'props': {'model': 'nullbr_api_key', 'label': 'Nullbr API Key', 'type': 'password', 'placeholder': '请输入 API Key'}}]}
                         ]
                     },
+                    # HDHive说明
+                    {
+                        'component': 'VRow',
+                        'content': [{
+                            'component': 'VCol',
+                            'props': {'cols': 12},
+                            'content': [{'component': 'VAlert', 'props': {'type': 'info', 'variant': 'tonal', 'text': 'HDHive资源查询：基于TMDB ID查询115网盘资源，优先使用Cookie认证（同步模式），异常时回退用户名密码登录（异步模式）'}}]
+                        }]
+                    },
+                    # HDHive 配置
+                    {
+                        'component': 'VRow',
+                        'content': [
+                            {'component': 'VCol', 'props': {'cols': 6, 'md': 3}, 'content': [{'component': 'VSwitch', 'props': {'model': 'hdhive_enabled', 'label': '启用 HDHive'}}]},
+                            {'component': 'VCol', 'props': {'cols': 12, 'md': 3}, 'content': [{'component': 'VTextField', 'props': {'model': 'hdhive_username', 'label': 'HDHive 用户名', 'placeholder': '用于异步模式登录'}}]},
+                            {'component': 'VCol', 'props': {'cols': 12, 'md': 3}, 'content': [{'component': 'VTextField', 'props': {'model': 'hdhive_password', 'label': 'HDHive 密码', 'type': 'password', 'placeholder': '用于异步模式登录'}}]},
+                            {'component': 'VCol', 'props': {'cols': 12, 'md': 3}, 'content': [{'component': 'VTextField', 'props': {'model': 'hdhive_cookie', 'label': 'HDHive Cookie', 'type': 'password', 'placeholder': 'token=xxx; csrf_access_token=xxx'}}]}
+                        ]
+                    },
                     # 风控防护说明
                     {
                         'component': 'VRow',
@@ -191,6 +210,10 @@ class UIConfig:
             "nullbr_appid": "",
             "nullbr_api_key": "",
             "nullbr_priority": True,
+            "hdhive_enabled": False,
+            "hdhive_username": "",
+            "hdhive_password": "",
+            "hdhive_cookie": "",
             "exclude_subscribes": [],
             "block_system_subscribe": False,
             "max_transfer_per_sync": 50,

@@ -20,15 +20,18 @@ from app.chain.download import DownloadChain
 from app.chain.subscribe import SubscribeChain
 from app.db import SessionFactory
 from app.db.subscribe_oper import SubscribeOper
+from app.db.downloadhistory_oper import DownloadHistoryOper
 from app.db.models.site import Site
 from app.log import logger
 from app.plugins import _PluginBase
 from app.schemas import MediaInfo
 from app.schemas.types import EventType, MediaType, NotificationType
+from app.utils.string import StringUtils
 
 from .pansou import PanSouClient
 from .p115client import P115ClientManager
 from .nullbr import NullbrClient
+from .hdhive import create_client as create_hdhive_client, MediaType as HDHiveMediaType
 from .ui_config import UIConfig
 from .file_matcher import FileMatcher, SubscribeFilter
 
@@ -45,7 +48,7 @@ class P115StrgmSub(_PluginBase):
     # 插件图标
     plugin_icon = "https://raw.githubusercontent.com/jxxghp/MoviePilot-Plugins/main/icons/cloud.png"
     # 插件版本
-    plugin_version = "1.0.8"
+    plugin_version = "1.0.9"
     # 插件作者
     plugin_author = "mrtian2016"
     # 作者主页
@@ -80,6 +83,10 @@ class P115StrgmSub(_PluginBase):
     _nullbr_appid: str = ""  # Nullbr APP ID（新字段名，避免加载旧配置）
     _nullbr_api_key: str = ""  # Nullbr API Key
     _nullbr_priority: bool = True  # Nullbr 优先（True: 优先使用 Nullbr，False: 优先使用 PanSou）
+    _hdhive_enabled: bool = False  # 是否启用 HDHive 查询
+    _hdhive_username: str = ""  # HDHive 用户名
+    _hdhive_password: str = ""  # HDHive 密码
+    _hdhive_cookie: str = ""  # HDHive Cookie
     _block_system_subscribe: bool = False  # 是否屏蔽系统订阅
     _max_transfer_per_sync: int = 50  # 单次同步最大转存数量，防止风控
     _batch_size: int = 20  # 批量转存每批文件数
@@ -88,6 +95,7 @@ class P115StrgmSub(_PluginBase):
     _pansou_client: Optional[PanSouClient] = None
     _p115_manager: Optional[P115ClientManager] = None
     _nullbr_client: Optional[NullbrClient] = None
+    _hdhive_client: Optional[Any] = None  # HDHive 客户端
 
     def init_plugin(self, config: dict = None):
         """初始化插件"""
@@ -115,6 +123,10 @@ class P115StrgmSub(_PluginBase):
             self._nullbr_appid = config.get("nullbr_appid", "")
             self._nullbr_api_key = config.get("nullbr_api_key", "")
             self._nullbr_priority = config.get("nullbr_priority", True)
+            self._hdhive_enabled = config.get("hdhive_enabled", False)
+            self._hdhive_username = config.get("hdhive_username", "")
+            self._hdhive_password = config.get("hdhive_password", "")
+            self._hdhive_cookie = config.get("hdhive_cookie", "")
             self._max_transfer_per_sync = int(config.get("max_transfer_per_sync", 50) or 50)
             self._batch_size = int(config.get("batch_size", 20) or 20)
             self._skip_other_season_dirs = config.get("skip_other_season_dirs", True)
@@ -172,6 +184,24 @@ class P115StrgmSub(_PluginBase):
             else:
                 self._nullbr_client = NullbrClient(app_id=self._nullbr_appid, api_key=self._nullbr_api_key)
                 logger.info("✓ Nullbr 客户端初始化成功")
+
+        # 初始化 HDHive 客户端
+        if self._hdhive_enabled:
+            if not self._hdhive_cookie and not (self._hdhive_username and self._hdhive_password):
+                logger.warning("⚠️ HDHive 已启用但缺少必要配置（Cookie 或 用户名/密码），将无法使用 HDHive 查询功能")
+                self._hdhive_client = None
+            elif self._hdhive_cookie:
+                # 优先使用 Cookie 初始化同步客户端
+                try:
+                    self._hdhive_client = create_hdhive_client(cookie=self._hdhive_cookie)
+                    logger.info("✓ HDHive 客户端初始化成功（Cookie 模式）")
+                except Exception as e:
+                    logger.warning(f"⚠️ HDHive 客户端初始化失败：{e}")
+                    self._hdhive_client = None
+            else:
+                # 没有 Cookie，仅记录用户名密码，用于异步回退
+                logger.info("✓ HDHive 配置已加载（用户名/密码模式，将使用异步客户端）")
+                self._hdhive_client = None  # 异步客户端在搜索时动态创建
 
          # 初始化 115 客户端
         if self._cookies:
@@ -276,6 +306,10 @@ class P115StrgmSub(_PluginBase):
             "nullbr_appid": self._nullbr_appid,
             "nullbr_api_key": self._nullbr_api_key,
             "nullbr_priority": self._nullbr_priority,
+            "hdhive_enabled": self._hdhive_enabled,
+            "hdhive_username": self._hdhive_username,
+            "hdhive_password": self._hdhive_password,
+            "hdhive_cookie": self._hdhive_cookie,
             "exclude_subscribes": self._exclude_subscribes,
             "block_system_subscribe": self._block_system_subscribe,
             "max_transfer_per_sync": self._max_transfer_per_sync,
@@ -359,6 +393,161 @@ class P115StrgmSub(_PluginBase):
             })
         return converted
 
+    def _convert_hdhive_to_pansou_format(self, hdhive_resources: List[Any]) -> List[Dict]:
+        """
+        将 HDHive 资源格式转换为统一的资源格式
+        
+        HDHive ResourceInfo: title, share_url, share_size, website, is_free, unlock_points 等
+        统一格式: {"url": "...", "title": "...", "update_time": ""}
+        
+        :param hdhive_resources: HDHive 返回的资源列表
+        :return: 统一格式的资源列表
+        """
+        converted = []
+        for resource in hdhive_resources:
+            # HDHive 资源可能是对象或字典
+            if hasattr(resource, 'url'):
+                url = resource.url or ""
+            elif isinstance(resource, dict):
+                url = resource.get("url", "") or resource.get("share_url", "")
+            else:
+                url = ""
+            
+            if hasattr(resource, 'title'):
+                title = resource.title or ""
+            elif isinstance(resource, dict):
+                title = resource.get("title", "")
+            else:
+                title = ""
+            
+            if url:  # 只添加有 URL 的资源
+                converted.append({
+                    "url": url,
+                    "title": title,
+                    "update_time": ""
+                })
+        return converted
+
+    def _search_hdhive(
+        self,
+        mediainfo: MediaInfo,
+        media_type: MediaType,
+        season: Optional[int] = None
+    ) -> List[Dict]:
+        """
+        使用 HDHive 搜索资源
+        优先使用同步版本，异常时回退到异步版本
+        
+        :param mediainfo: 媒体信息
+        :param media_type: 媒体类型（MOVIE 或 TV）
+        :param season: 季号（电视剧时使用）
+        :return: 115网盘资源列表（统一格式）
+        """
+        if not mediainfo.tmdb_id:
+            logger.warning(f"⚠️ {mediainfo.title} 缺少 TMDB ID，无法使用 HDHive 查询")
+            return []
+
+        hdhive_media_type = HDHiveMediaType.MOVIE if media_type == MediaType.MOVIE else HDHiveMediaType.TV
+        
+        # 方法1: 尝试使用同步客户端（Cookie 模式）
+        if self._hdhive_client:
+            try:
+                logger.info(f"使用 HDHive (Sync) 查询: {mediainfo.title} (TMDB ID: {mediainfo.tmdb_id})")
+                
+                # 获取媒体信息
+                with self._hdhive_client as client:
+                    media = client.get_media_by_tmdb_id(mediainfo.tmdb_id, hdhive_media_type)
+                    if not media:
+                        logger.info(f"HDHive (Sync) 未找到媒体: {mediainfo.title}")
+                        return []
+                    
+                    # 获取资源列表
+                    resources_result = client.get_resources(media.slug, hdhive_media_type, media_id=media.id)
+                    if not resources_result or not resources_result.success:
+                        logger.info(f"HDHive (Sync) 获取资源列表失败: {mediainfo.title}")
+                        return []
+                    
+                    # 过滤免费的 115 资源
+                    free_115_resources = []
+                    for res in resources_result.resources:
+                        if hasattr(res, 'website') and res.website.value == '115' and res.is_free:
+                            # 获取分享链接
+                            share_result = client.get_share_url(res.slug)
+                            if share_result and share_result.url:
+                                free_115_resources.append({
+                                    "url": share_result.url,
+                                    "title": res.title,
+                                    "update_time": ""
+                                })
+                    
+                    if free_115_resources:
+                        logger.info(f"HDHive (Sync) 找到 {len(free_115_resources)} 个免费 115 资源")
+                        return free_115_resources
+                    else:
+                        logger.info(f"HDHive (Sync) 未找到免费 115 资源")
+                        return []
+                        
+            except Exception as e:
+                logger.warning(f"HDHive (Sync) 查询失败: {e}，尝试异步模式...")
+        
+        # 方法2: 回退到异步客户端（用户名/密码模式）
+        if self._hdhive_username and self._hdhive_password:
+            try:
+                import asyncio
+                from .hdhive import create_async_client as create_hdhive_async_client
+                
+                logger.info(f"使用 HDHive (Async) 查询: {mediainfo.title} (TMDB ID: {mediainfo.tmdb_id})")
+                
+                async def async_search():
+                    async with create_hdhive_async_client(
+                        username=self._hdhive_username,
+                        password=self._hdhive_password,
+                        headless=True
+                    ) as client:
+                        # 获取媒体信息
+                        media = await client.get_media_by_tmdb_id(mediainfo.tmdb_id, hdhive_media_type)
+                        if not media:
+                            return []
+                        
+                        # 获取资源列表
+                        resources_result = await client.get_resources(media.slug, hdhive_media_type, media_id=media.id)
+                        if not resources_result or not resources_result.success:
+                            return []
+                        
+                        # 过滤免费的 115 资源并获取分享链接
+                        free_115_resources = []
+                        for res in resources_result.resources:
+                            if hasattr(res, 'website') and res.website.value == '115' and res.is_free:
+                                share_result = await client.get_share_url_by_click(res.slug)
+                                if share_result and share_result.url:
+                                    free_115_resources.append({
+                                        "url": share_result.url,
+                                        "title": res.title,
+                                        "update_time": ""
+                                    })
+                        
+                        return free_115_resources
+                
+                # 运行异步任务
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                try:
+                    results = loop.run_until_complete(async_search())
+                finally:
+                    loop.close()
+                
+                if results:
+                    logger.info(f"HDHive (Async) 找到 {len(results)} 个免费 115 资源")
+                else:
+                    logger.info(f"HDHive (Async) 未找到免费 115 资源")
+                return results
+                
+            except Exception as e:
+                logger.error(f"HDHive (Async) 查询失败: {e}")
+                return []
+        
+        return []
+
     def _check_and_finish_subscribe(self, subscribe, mediainfo, success_episodes):
         """
         检查订阅是否完成，如果完成则调用官方接口
@@ -368,15 +557,30 @@ class P115StrgmSub(_PluginBase):
         :param success_episodes: 本次成功转存的集数列表（电影为[1]）
         """
         try:
-            # 更新缺失集数
+            # 1. 更新 note 字段（记录已下载集数，与系统订阅检查兼容）
+            # 系统会读取 note 字段来判断哪些集已下载，避免 lack_episode 被重置
+            current_note = subscribe.note or []
+            if mediainfo.type == MediaType.TV:
+                new_note = list(set(current_note).union(set(success_episodes)))
+            else:
+                # 电影用 [1] 表示已下载
+                new_note = list(set(current_note).union({1}))
+            
+            # 2. 更新缺失集数
             current_lack = subscribe.lack_episode
             new_lack = max(0, current_lack - len(success_episodes))
             
+            # 3. 一次性更新 note 和 lack_episode
+            update_data = {}
+            if new_note != current_note:
+                update_data["note"] = new_note
+                logger.info(f"更新订阅 {subscribe.name} note 字段：{current_note} -> {new_note}")
             if new_lack != current_lack:
-                SubscribeOper().update(subscribe.id, {
-                    "lack_episode": new_lack
-                })
+                update_data["lack_episode"] = new_lack
                 logger.info(f"更新订阅 {subscribe.name} 缺失集数：{current_lack} -> {new_lack}")
+            
+            if update_data:
+                SubscribeOper().update(subscribe.id, update_data)
             
             # 检查是否完成
             if new_lack == 0:
@@ -448,6 +652,7 @@ class P115StrgmSub(_PluginBase):
     ) -> List[Dict]:
         """
         统一的资源搜索方法，支持电影和电视剧
+        搜索优先级: Nullbr > HDHive > PanSou
         
         :param mediainfo: 媒体信息
         :param media_type: 媒体类型（MOVIE 或 TV）
@@ -475,9 +680,18 @@ class P115StrgmSub(_PluginBase):
                     p115_results = self._convert_nullbr_to_pansou_format(nullbr_resources)
                     logger.info(f"Nullbr 找到 {len(p115_results)} 个资源")
                 else:
-                    logger.info(f"Nullbr 优先模式未找到资源，将回退到 PanSou 搜索")
+                    logger.info(f"Nullbr 优先模式未找到资源，将回退到 HDHive/PanSou 搜索")
         
-        # 2. 如果 NullBR 未找到，使用 PanSou
+        # 2. 如果 Nullbr 未找到，使用 HDHive
+        if not p115_results and self._hdhive_enabled:
+            hdhive_results = self._search_hdhive(mediainfo, media_type, season)
+            if hdhive_results:
+                p115_results = hdhive_results
+                logger.info(f"HDHive 找到 {len(p115_results)} 个资源")
+            else:
+                logger.info(f"HDHive 未找到资源，将回退到 PanSou 搜索")
+        
+        # 3. 如果 HDHive 也未找到，使用 PanSou
         if not p115_results and self._pansou_enabled and self._pansou_client:
             # 构建搜索关键词
             if media_type == MediaType.MOVIE:
@@ -569,13 +783,13 @@ class P115StrgmSub(_PluginBase):
     def _do_sync(self):
         """执行同步"""
         # 检查至少有一个搜索客户端可用
-        if not self._pansou_enabled and not self._nullbr_enabled:
-            logger.error("PanSou 和 Nullbr 搜索源均未启用，请至少启用一个搜索源")
+        if not self._pansou_enabled and not self._nullbr_enabled and not self._hdhive_enabled:
+            logger.error("PanSou、Nullbr 和 HDHive 搜索源均未启用，请至少启用一个搜索源")
             if self._notify:
                 self.post_message(
                     mtype=NotificationType.Plugin,
                     title="【115网盘订阅追更】配置错误",
-                    text="PanSou 和 Nullbr 搜索源均未启用，请至少启用一个搜索源。"
+                    text="PanSou、Nullbr 和 HDHive 搜索源均未启用，请至少启用一个搜索源。"
                 )
             return
 
@@ -592,6 +806,13 @@ class P115StrgmSub(_PluginBase):
                 has_valid_client = True
             else:
                 logger.warning("Nullbr 已启用但客户端未初始化，请检查 APP ID 和 API Key 配置")
+
+        if self._hdhive_enabled:
+            # HDHive 可以有同步客户端或仅配置用户名密码（用于异步回退）
+            if self._hdhive_client or (self._hdhive_username and self._hdhive_password):
+                has_valid_client = True
+            else:
+                logger.warning("HDHive 已启用但缺少必要配置（Cookie 或 用户名/密码）")
 
         if not has_valid_client:
             logger.error("所有已启用的搜索源均初始化失败，请检查配置")
@@ -834,6 +1055,31 @@ class P115StrgmSub(_PluginBase):
                                     "image": mediainfo.get_poster_image(),
                                     "file_name": file_name
                                 })
+
+                                # 添加下载历史记录
+                                try:
+                                    DownloadHistoryOper().add(
+                                        path=save_dir,
+                                        type=mediainfo.type.value,
+                                        title=mediainfo.title,
+                                        year=mediainfo.year,
+                                        tmdbid=mediainfo.tmdb_id,
+                                        imdbid=mediainfo.imdb_id,
+                                        tvdbid=mediainfo.tvdb_id,
+                                        doubanid=mediainfo.douban_id,
+                                        image=mediainfo.get_poster_image(),
+                                        downloader="115网盘",
+                                        download_hash=matched_file.get("id"),
+                                        torrent_name=resource_title,
+                                        torrent_description=file_name,
+                                        torrent_site="115网盘",
+                                        username="P115StrgmSub",
+                                        date=datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                                        note={"source": f"Subscribe|{subscribe.name}", "share_url": share_url}
+                                    )
+                                    logger.debug(f"已记录电影 {mediainfo.title} 下载历史")
+                                except Exception as e:
+                                    logger.warning(f"记录下载历史失败：{e}")
 
                                 # 电影转存成功后完成订阅
                                 self._check_and_finish_subscribe(
@@ -1128,6 +1374,8 @@ class P115StrgmSub(_PluginBase):
 
                         # 将成功的 file_id 转为集合，便于快速查找
                         success_id_set = set(success_ids)
+                        # 收集本次批量转存成功的剧集号（用于下载历史记录）
+                        batch_success_episodes = []
 
                         # 第三阶段：根据批量转存结果处理历史记录和状态
                         for item in matched_items:
@@ -1187,8 +1435,40 @@ class P115StrgmSub(_PluginBase):
                                         "episodes": [episode],
                                         "image": mediainfo.get_poster_image()
                                     })
+
+                                # 收集成功的剧集号
+                                batch_success_episodes.append(episode)
                             else:
                                 logger.error(f"转存失败：{mediainfo.title} S{season:02d}E{episode:02d}")
+
+                        # 批量转存完成后，汇总记录下载历史
+                        if batch_success_episodes:
+                            try:
+                                # 使用 StringUtils.format_ep 格式化剧集列表，如 [15, 16] -> "E15-E16"
+                                episodes_str = StringUtils.format_ep(batch_success_episodes)
+                                DownloadHistoryOper().add(
+                                    path=save_dir,
+                                    type=mediainfo.type.value,
+                                    title=mediainfo.title,
+                                    year=mediainfo.year,
+                                    tmdbid=mediainfo.tmdb_id,
+                                    imdbid=mediainfo.imdb_id,
+                                    tvdbid=mediainfo.tvdb_id,
+                                    doubanid=mediainfo.douban_id,
+                                    seasons=f"S{season:02d}",
+                                    episodes=episodes_str,
+                                    image=mediainfo.get_poster_image(),
+                                    downloader="115网盘",
+                                    download_hash=share_url,  # 使用分享链接作为唯一标识
+                                    torrent_name=resource_title,
+                                    torrent_site="115网盘",
+                                    username="P115StrgmSub",
+                                    date=datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                                    note={"source": f"Subscribe|{subscribe.name}", "share_url": share_url}
+                                )
+                                logger.debug(f"已记录 {mediainfo.title} S{season:02d} {episodes_str} 下载历史")
+                            except Exception as e:
+                                logger.warning(f"记录下载历史失败：{e}")
 
                         # 如果所有缺失剧集都已转存，跳出循环
                         if not missing_episodes:
