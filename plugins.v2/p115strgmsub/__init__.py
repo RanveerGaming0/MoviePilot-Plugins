@@ -56,7 +56,7 @@ class P115StrgmSub(_PluginBase):
     # 插件图标
     plugin_icon = "https://raw.githubusercontent.com/jxxghp/MoviePilot-Plugins/main/icons/cloud.png"
     # 插件版本
-    plugin_version = "1.1.1"
+    plugin_version = "1.1.2"
     # 插件作者
     plugin_author = "mrtian2016"
     # 作者主页
@@ -521,6 +521,7 @@ class P115StrgmSub(_PluginBase):
                     username=self._hdhive_username,
                     password=self._hdhive_password,
                     cookie=self._hdhive_cookie,
+                    browser_type="chromium",
                     headless=True,
                     proxy=proxy
                 ) as client:

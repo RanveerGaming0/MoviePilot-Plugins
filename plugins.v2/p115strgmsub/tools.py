@@ -261,7 +261,7 @@ def refresh_hdhive_cookie_with_playwright(
                     logger.info(f"HDHive Cookie 刷新使用代理: {proxy_url}")
 
             # 使用 Firefox（更容易绕过 Cloudflare）
-            browser = pw.firefox.launch(**launch_options)
+            browser = pw.chromium.launch(**launch_options)
             context = browser.new_context(**context_options)
             page = context.new_page()
 
