@@ -271,8 +271,11 @@ class P115StrgmSub(_PluginBase):
             elif self._hdhive_cookie:
                 # 优先使用 Cookie 初始化同步客户端
                 try:
+                    import os
                     from .lib.hdhive import create_client as create_hdhive_client
-                    self._hdhive_client = create_hdhive_client(cookie=self._hdhive_cookie)
+                    proxy_host = os.environ.get("PROXY_HOST")
+                    proxy = {"http": proxy_host, "https": proxy_host} if proxy_host else None
+                    self._hdhive_client = create_hdhive_client(cookie=self._hdhive_cookie, proxy=proxy)
                     logger.info("✓ HDHive 客户端初始化成功（Cookie 模式）")
                 except Exception as e:
                     logger.warning(f"⚠️ HDHive 客户端初始化失败：{e}")
@@ -574,7 +577,11 @@ class P115StrgmSub(_PluginBase):
         if self._hdhive_username and self._hdhive_password:
             try:
                 import asyncio
+                import os
                 from .hdhive import create_async_client as create_hdhive_async_client
+                
+                proxy_host = os.environ.get("PROXY_HOST")
+                proxy = {"http": proxy_host, "https": proxy_host} if proxy_host else None
                 
                 logger.info(f"使用 HDHive (Async) 查询: {mediainfo.title} (TMDB ID: {mediainfo.tmdb_id})")
                 
@@ -582,7 +589,8 @@ class P115StrgmSub(_PluginBase):
                     async with create_hdhive_async_client(
                         username=self._hdhive_username,
                         password=self._hdhive_password,
-                        headless=True
+                        headless=True,
+                        proxy=proxy
                     ) as client:
                         # 获取媒体信息
                         media = await client.get_media_by_tmdb_id(mediainfo.tmdb_id, hdhive_media_type)
