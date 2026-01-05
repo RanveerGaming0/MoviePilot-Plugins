@@ -61,7 +61,7 @@ class SubscribeHandler:
 
             # 2. 更新缺失集数
             # 根据已下载集数和总集数计算新的缺失集数
-            current_lack = subscribe.lack_episode
+            current_lack = subscribe.lack_episode or 0
             total_episode = subscribe.total_episode or 0
             start_episode = subscribe.start_episode or 1
             
